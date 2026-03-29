@@ -703,3 +703,488 @@ El propio README indica que no se recomienda instalarlo como paquete npm global.
 - `C:\Users\maest\Desktop\Genesys-deploys\NODOS\solana-node-cli\package.json`
 - `C:\Users\maest\Desktop\Genesys-deploys\NODOS\solana-node-cli\CHANGELOG.md`
 - `C:\Users\maest\Desktop\Genesys-deploys\NODOS\solana-node-cli\src\lib\install.ts`
+
+
+
+
+----------------------------------------------------------------
+
+# Analisis De Esta PC Y Armado Recomendado Para Nodos 2026
+
+Fecha: 2026-03-29
+
+## 1. Especificaciones Detectadas En Esta PC
+
+Analisis realizado con comandos de PowerShell sobre Windows 11.
+
+### Comandos usados
+
+```powershell
+$cpu = Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed,Manufacturer
+$ramModules = Get-CimInstance Win32_PhysicalMemory | Select-Object Manufacturer,PartNumber,Capacity,Speed,ConfiguredClockSpeed
+$totalRam = [math]::Round(((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB),2)
+$board = Get-CimInstance Win32_BaseBoard | Select-Object Manufacturer,Product,SerialNumber
+$bios = Get-CimInstance Win32_BIOS | Select-Object SMBIOSBIOSVersion,Manufacturer,ReleaseDate
+$os = Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,OSArchitecture
+$gpu = Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion
+$disks = Get-PhysicalDisk | Select-Object FriendlyName,MediaType,BusType,Size,HealthStatus,SpindleSpeed
+$volumes = Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter,FileSystemLabel,FileSystem,SizeRemaining,Size
+$net = Get-NetAdapter | Where-Object Status -eq 'Up' | Select-Object Name,InterfaceDescription,LinkSpeed,MacAddress
+```
+
+### Resultado resumido
+
+- SO: Windows 11 Home 64-bit.
+- CPU: AMD Ryzen 7 5700G.
+- Cores / threads: 8 / 16.
+- Clock maximo reportado: 4.3 GHz.
+- RAM total: 31.3 GB.
+- RAM instalada: 2 x 16 GB Kingston DDR4-3200.
+- Motherboard: ASUS ROG STRIX B550-F GAMING WIFI II.
+- GPU: Radeon integrada del 5700G.
+- Red fisica: Intel I226-V a 1 Gbps.
+
+### Almacenamiento detectado
+
+- NVMe: `PC SN5000S SDEPNSJ-512G-1006` de 512 GB.
+- SATA SSD: `HS-SSD-WAVE(N) 1024G` de 1 TB.
+
+### Espacio visible en volúmenes
+
+- Unidad `T:` de 512 GB con aprox. 486 GB libres.
+- Unidad `C:` de 1 TB con aprox. 404 GB libres.
+- Espacio libre total visible: aprox. 890 GB.
+
+## 2. Diagnostico Frente A BSC
+
+### Requisito objetivo de BSC mainnet
+
+- 16 cores CPU.
+- 64 GB RAM.
+- 3 TB libres.
+- SSD obligatorio; NVMe preferible y en ciertos escenarios necesario.
+- Red de al menos 5 MB/s subida y bajada.
+
+### Estado de esta PC frente a BSC
+
+- CPU: insuficiente.
+  - Tienes 8 cores y el repo pide 16 cores para mainnet.
+- RAM: insuficiente.
+  - Tienes 32 GB y BSC pide 64 GB.
+- Disco: muy insuficiente.
+  - Tienes 1.5 TB brutos y menos de 1 TB libre visible.
+  - BSC pide 3 TB libres solo para mainnet.
+- Tipo de disco: insuficiente para una operacion comoda.
+  - Solo tienes 512 GB NVMe.
+  - El resto es SATA SSD; para BSC serio conviene mucho mas NVMe grande.
+- Red: aceptable en enlace local si tu proveedor realmente entrega 1 Gbps estable.
+  - No tengo medicion real de internet desde estos comandos, solo el link speed del adaptador.
+
+### Que habria que mejorar para BSC
+
+1. Subir CPU a una plataforma de al menos 16 cores reales.
+2. Llevar RAM a 64 GB como piso; 128 GB mejor para margen operativo.
+3. Agregar al menos un NVMe de 4 TB dedicado a BSC.
+4. Preferir Linux para operacion continua, aunque el repo menciona Windows como posible.
+5. Mantener la red cableada y estable.
+
+## 3. Diagnostico Frente A Base
+
+### Requisito objetivo de Base
+
+- CPU multicore moderna.
+- 32 GB RAM minimo.
+- 64 GB recomendado.
+- NVMe SSD.
+- Storage calculado como `2 x chain size + snapshot + 20% buffer`.
+- Docker + Docker Compose.
+- Ademas necesitas RPC L1 Ethereum, Beacon y Beacon Archiver.
+
+### Estado de esta PC frente a Base
+
+- CPU: usable pero justa.
+  - El 5700G podria levantar algo de laboratorio, pero no es una plataforma ideal para operar Base con holgura.
+- RAM: en el minimo, no en el recomendado.
+  - Tienes 32 GB, que coincide con el minimo.
+  - Para produccion o coexistencia con otros servicios, yo no lo consideraria suficiente.
+- Disco: insuficiente.
+  - El cuello de botella mas claro es storage NVMe.
+  - Tienes 512 GB NVMe y 1 TB SATA; Base prefiere NVMe y bastante margen de capacidad.
+- Dependencia externa: faltante operacional.
+  - Necesitas endpoints L1 Ethereum adicionales; no basta con la PC sola.
+
+### Que habria que mejorar para Base
+
+1. Llevar RAM a 64 GB minimo recomendable.
+2. Agregar uno o dos NVMe grandes, minimo 2 TB y preferible 4 TB segun el crecimiento.
+3. Mantener Base separado de otras cargas intensivas.
+4. Contar con servicios L1 Ethereum confiables.
+
+## 4. Puede Esta PC Correr BSC Y Base A La Vez
+
+Respuesta corta: no, no de forma seria.
+
+### Motivos
+
+- CPU insuficiente para correr BSC mainnet con margen y ademas Base.
+- 32 GB RAM no alcanzan para ambas cargas con estabilidad.
+- El almacenamiento es el bloqueo principal:
+  - BSC solo ya pide 3 TB libres.
+  - Base ademas necesita NVMe y bastante crecimiento.
+- Solo hay 1 NVMe pequeño de 512 GB.
+- El segundo SSD es SATA, que no es lo ideal para esta combinacion.
+
+## 5. Upgrade Minimo Sobre Esta PC
+
+Si quisieras exprimir esta misma plataforma B550 sin cambiar motherboard, el maximo upgrade razonable seria:
+
+- CPU: Ryzen 9 5950X.
+- RAM: 128 GB DDR4 si la placa y los modulos elegidos lo soportan estable.
+- Discos:
+  - NVMe 4 TB dedicado a Base o BSC.
+  - SSD adicional 4 TB, idealmente tambien NVMe si usas expansion PCIe.
+
+### Limite de este enfoque
+
+- Aun con 5950X + 128 GB + discos nuevos, seguiria siendo una plataforma apretada para BSC + Base juntos en serio.
+- Para Solana full node directamente no alcanza.
+- Para BSC solo podria quedar bastante mejor.
+- Para Base solo podria quedar razonable.
+- Para ambos a la vez, no es la opcion que te recomendaria.
+
+## 6. PC Recomendada 2026 Para Correr BSC Y BASE En Una Sola PC
+
+Objetivo de esta build:
+
+- correr BSC mainnet y Base en la misma workstation
+- separar discos por carga
+- dejar margen de crecimiento 2026+
+- operar estable 24/7
+
+### Build recomendada
+
+| Componente | Recomendacion | Motivo |
+| --- | --- | --- |
+| CPU | AMD Threadripper Pro 7975WX o 7965WX | Muchos cores, alto rendimiento sostenido, mucha expansion PCIe y plataforma de workstation real |
+| Motherboard | WRX90 de gama workstation | Necesitas muchas lineas PCIe, varios NVMe y gran capacidad de RAM ECC |
+| RAM | 256 GB DDR5 ECC RDIMM | BSC + Base juntos merecen mucho margen; ECC ayuda en cargas 24/7 |
+| Disco SO | NVMe 2 TB Gen4 o Gen5 | Sistema, Docker, herramientas, logs y utilidades |
+| Disco BSC | NVMe enterprise 8 TB | BSC ya pide 3 TB libres y va a seguir creciendo |
+| Disco Base | NVMe 4 TB | Espacio razonable para Base con snapshots y crecimiento |
+| Disco snapshots / scratch | NVMe 4 TB | Acelera restores, staging y mantenimiento |
+| Red | NIC 10GbE Intel o Mellanox | Aunque hoy tu internet no sea 10G, te da piso serio para I/O y futuro |
+| GPU | Basica o integrada, sin foco gaming | Para nodos no es prioridad |
+| PSU | 1200W 80+ Platinum | Plataforma workstation + varios NVMe + estabilidad 24/7 |
+| Refrigeracion | AIO 360 mm o aire premium workstation | Carga sostenida, ruido controlado y estabilidad |
+| Gabinete | Full tower con alto flujo de aire | Muchos discos, buena ventilacion, mantenimiento mas limpio |
+| UPS | 1500VA o superior senoidal | Fundamental para cortes y evitar corrupcion de datos |
+
+### Distribucion recomendada de cargas
+
+- BSC en su propio NVMe de 8 TB.
+- Base `execution` y `op-node` en NVMe de 4 TB dedicado.
+- SO y herramientas separados.
+- Snapshots y restauraciones en otro NVMe distinto.
+
+### Sistema operativo recomendado
+
+- Ubuntu LTS.
+
+### Comentario tecnico
+
+- Si quieres una sola PC para ambas redes, el verdadero cuello de botella es storage y no solo CPU.
+- Por eso en esta build sobredimensiono NVMe y RAM.
+- Esta build es de workstation seria, no de PC gamer adaptada.
+
+## 7. PC Recomendada 2026 Para Full Nodo Solana
+
+Objetivo de esta build:
+
+- full node Solana serio
+- margen para validator o RPC node fuerte
+- storage separado segun las guias de Agave
+- conectividad y memoria coherentes con el perfil de Solana
+
+### Build recomendada
+
+| Componente | Recomendacion | Motivo |
+| --- | --- | --- |
+| CPU | AMD Threadripper Pro 7965WX o 7975WX | Solana necesita clock alto, muchos hilos, gran I/O y mucha RAM direccionable |
+| Motherboard | WRX90 workstation | Soporte de ECC, varios NVMe y plataforma mas apropiada que escritorio comun |
+| RAM | 512 GB DDR5 ECC RDIMM | Agave indica 256 GB para validator y 512 GB para RPC con account indexes |
+| Disco SO | NVMe 2 TB | SO, herramientas y monitoreo |
+| Disco accounts | NVMe enterprise 2 TB minimo, mejor 4 TB | Accounts merece disco dedicado y rapido |
+| Disco ledger | NVMe enterprise 2 TB minimo, mejor 4 TB | Ledger separado reduce cuellos de IOPS |
+| Disco snapshots | NVMe 1 TB minimo, mejor 2 TB | Restore y rotacion de snapshots |
+| Red | 10GbE real como piso de diseño | El repo sugiere 2 Gbps para stake y 10 Gbps recomendado |
+| PSU | 1200W 80+ Platinum | Estabilidad 24/7 |
+| Refrigeracion | Solucion premium de workstation | Carga sostenida continua |
+| Gabinete | Full tower de alto flujo | Temperaturas y espacio |
+| UPS | 1500VA o superior senoidal | Muy recomendable para no corromper ledger/accounts |
+
+### Si el objetivo es solo validator sin RPC pesado
+
+- Podrias bajar a 256 GB ECC RAM.
+- Podrias bajar CPU a una opcion algo menor, pero no recomiendo apretar demasiado si quieres vida util 2026+.
+
+### Si el objetivo es RPC node pesado
+
+- Mantendria 512 GB ECC RAM.
+- Mantendria discos separados y mas grandes.
+- Mantendria 10GbE y plataforma workstation.
+
+## 8. Comparativa De Armado 2026
+
+| Perfil | CPU | RAM | Storage | Red | Comentario |
+| --- | --- | --- | --- | --- | --- |
+| Tu PC actual | Ryzen 7 5700G | 32 GB DDR4 | 512 GB NVMe + 1 TB SATA | 1GbE | No apta para BSC mainnet ni para BSC+Base juntos; muy lejos de Solana full node |
+| Build para BSC + Base juntos | Threadripper Pro 7965WX/7975WX | 256 GB ECC | 2 TB SO + 8 TB BSC + 4 TB Base + 4 TB scratch | 10GbE | Build workstation seria y equilibrada para ambas redes en una sola maquina |
+| Build para Solana full node | Threadripper Pro 7965WX/7975WX | 512 GB ECC | 2 TB SO + 2-4 TB accounts + 2-4 TB ledger + 1-2 TB snapshots | 10GbE | Build enfocada a validator/RPC serio con Agave |
+
+## 9. Recomendacion Final Para Tu Caso
+
+### Si quieres gastar lo minimo
+
+- Usa esta PC solo para laboratorio, pruebas o Base muy contenido.
+- No la usaria para BSC mainnet serio.
+- No la usaria para Solana full node.
+
+### Si quieres una sola maquina para BSC + Base
+
+- Salta directo a plataforma workstation con Threadripper Pro, 256 GB ECC y varios NVMe dedicados.
+
+### Si quieres Solana serio
+
+- Haz otra maquina separada.
+- Solana compite muy fuerte por RAM, IOPS y red.
+- Mezclar Solana con BSC o Base en la misma PC no es buena idea si buscas estabilidad real.
+
+## 10. Veredicto Sobre Esta PC
+
+### Sirve para:
+
+- desarrollo
+- testing
+- snapshots parciales
+- tooling
+- laboratorio Docker
+- Base muy contenido y no ideal
+
+### No sirve bien para:
+
+- BSC mainnet serio
+- BSC + Base juntos
+- Solana full node real
+
+### Cuellos de botella principales
+
+1. RAM.
+2. Capacidad de NVMe.
+3. Cantidad total de storage.
+4. Plataforma no workstation para cargas multidisco / mucha RAM / ECC.
+
+
+
+
+-------------------------------------------------
+
+# Lista De Compra Exacta Para Nodos 2026
+
+Fecha: 2026-03-29
+
+Este documento complementa [NODOS/ANALISIS_PC_PARA_NODOS_2026.md](NODOS/ANALISIS_PC_PARA_NODOS_2026.md) y te deja referencias de compra concretas.
+
+## Criterio De Compatibilidad Que Si Verifique
+
+- Tu placa actual es `ASUS ROG STRIX B550-F GAMING WIFI II`, plataforma AM4.
+- `ASUS ProArt X870E-CREATOR WIFI` usa socket `AM5`, DDR5 UDIMM, hasta `256 GB`, 4 x M.2 y 10GbE integrado.
+- `ASUS Pro WS WRX90E-SAGE SE` usa socket `sTR5`, soporta `Ryzen Threadripper PRO 7000/9000 WX`, `8 x DIMM DDR5 ECC Registered`, `4 x M.2`, `2 x 10GbE` integrados y formato `EEB`.
+- `Fractal Meshify 2 XL` soporta `SSI-EEB`, `E-ATX` y fuente `ATX`, por lo que sirve para la WRX90.
+- `Micron MTC40F2046S1RC64BR` aparece como memoria compatible para `ASUS Pro WS WRX90E-SAGE SE` en el configurador de Crucial.
+- `Micron MTC40F2047S1RC56BR` aparece como memoria compatible de `128 GB DDR5-5600 RDIMM` para `ASUS Pro WS WRX90E-SAGE SE`.
+- `Samsung 9100 PRO` aparece como SSD M.2 NVMe Gen5 vigente en 2026.
+- `Samsung 990 PRO` sigue siendo referencia M.2 NVMe Gen4 vigente.
+
+## 1. Referencia Exacta Para Aprovechar Tu PC Actual
+
+Objetivo:
+
+- dejar tu AM4 al maximo razonable
+- laboratorio fuerte
+- Base contenido
+- BSC no productivo serio, pero bastante mejor que hoy
+
+### BOM exacta sobre tu placa actual
+
+| Componente | Modelo exacto | Compatibilidad |
+| --- | --- | --- |
+| CPU | AMD Ryzen 9 5950X | Compatible con plataforma AM4/B550 |
+| Cooler | Noctua NH-D15 chromax.black | Compatible con AM4 |
+| RAM | Corsair Vengeance LPX 128GB (4x32GB) DDR4-3200 CL16, modelo `CMK128GX4M4E3200C16` | DDR4 UDIMM estándar para AM4; apunta al máximo práctico de 128 GB |
+| SSD NVMe principal | Samsung 990 PRO 4TB M.2 NVMe 2280 | Formato M.2 2280 estándar |
+| SSD SATA secundario | Samsung 870 EVO 4TB 2.5" SATA | Compatible con puertos SATA del B550 |
+| PSU | Seasonic Focus GX-1000 ATX 3.0 | Compatible con ATX estándar |
+
+### Qué esperar de esta ruta
+
+- Mucho mejor que tu PC actual.
+- Aún no la consideraría una máquina seria para `BSC mainnet`.
+- Puede servir para `Base` de laboratorio o para pruebas prolongadas.
+- No la usaría para `Solana full node`.
+
+## 2. PC Exacta 2026 Para Correr BSC Y BASE En Una Sola Maquina
+
+Objetivo:
+
+- una sola workstation
+- BSC mainnet + Base al mismo tiempo
+- storage separado por carga
+- red integrada de alto nivel
+- margen real 2026+
+
+## Opcion recomendada principal
+
+### BOM exacta
+
+| Componente | Modelo exacto | Por qué |
+| --- | --- | --- |
+| CPU | AMD Ryzen Threadripper PRO 7965WX | 24 cores, plataforma workstation real, margen amplio para dos nodos pesados |
+| Motherboard | ASUS Pro WS WRX90E-SAGE SE | sTR5, 8 DIMM DDR5 ECC RDIMM, 4 x M.2, dual 10GbE, formato workstation |
+| Cooler CPU | Noctua NH-U14S TR5-SP6 | Diseñado específicamente para TR5/SP6 |
+| RAM | 4 x Micron 64GB DDR5-6400 RDIMM `MTC40F2046S1RC64BR` | 256 GB totales; módulo compatible detectado para esta placa |
+| SSD SO / herramientas | Samsung 990 PRO 4TB M.2 NVMe 2280 | SO, Docker, logs, utilidades |
+| SSD BSC | Samsung 9100 PRO 8TB M.2 NVMe 2280 | Disco dedicado para BSC y su crecimiento |
+| SSD Base | Samsung 990 PRO 4TB M.2 NVMe 2280 | Disco dedicado para Base |
+| SSD snapshots / scratch | Samsung 990 PRO 4TB M.2 NVMe 2280 | Restore, staging, snapshots y operaciones |
+| Gabinete | Fractal Design Meshify 2 XL `FD-C-MES2X-01` | Soporta SSI-EEB y ATX; encaja la WRX90 |
+| PSU | Seasonic PRIME TX-1600 ATX 3 | Margen sobrado para workstation 24/7 y muchos discos |
+| UPS | APC Smart-UPS SMT1500IC | Protección de energía seria para storage intensivo |
+| SO recomendado | Ubuntu 24.04 LTS | Más razonable para operar nodos 24/7 |
+
+### Compatibilidad de esta build
+
+- CPU y motherboard:
+  - `7965WX` figura en soporte CPU de la `Pro WS WRX90E-SAGE SE`.
+- RAM y motherboard:
+  - la WRX90 exige `DDR5 ECC Registered Memory`.
+  - `Micron MTC40F2046S1RC64BR` figura como memoria compatible para esa placa.
+- Case y motherboard:
+  - `Meshify 2 XL` soporta `SSI-EEB`, y la WRX90 es `EEB 12 x 13`.
+- PSU y case:
+  - el case admite PSU ATX.
+- SSDs y motherboard:
+  - la WRX90 soporta 4 slots `M.2 Key M` tipo `2242/2260/2280/22110`.
+  - `Samsung 9100 PRO` y `990 PRO` son M.2 2280 NVMe.
+
+### Distribucion recomendada
+
+- `M.2_1`: SO + herramientas = `Samsung 990 PRO 4TB`
+- `M.2_2`: BSC = `Samsung 9100 PRO 8TB`
+- `M.2_3`: Base = `Samsung 990 PRO 4TB`
+- `M.2_4`: snapshots / scratch = `Samsung 990 PRO 4TB`
+
+### Comentario tecnico
+
+- Esta es la build que yo compraría si de verdad quieres `BSC + Base` en una sola caja.
+- Usa plataforma workstation para evitar quedarte corto con RAM, PCIe y storage.
+
+## Opcion mas barata, pero menos holgada
+
+### BOM exacta AM5
+
+| Componente | Modelo exacto | Por qué |
+| --- | --- | --- |
+| CPU | AMD Ryzen 9 9950X | 16C/32T, muy buen clock, plataforma AM5 actual |
+| Motherboard | ASUS ProArt X870E-CREATOR WIFI | AM5, hasta 256 GB DDR5, 4 x M.2, 10GbE integrado |
+| Cooler CPU | Noctua NH-D15 G2 | Compatibilidad AM5 y disipación alta |
+| RAM | 4 x Crucial 32GB DDR5-5600 UDIMM `CT32G56C46U5` | 128 GB totales, módulo compatible detectado para esta placa |
+| SSD SO / herramientas | Samsung 990 PRO 4TB M.2 NVMe 2280 | Sistema y contenedores |
+| SSD BSC | Samsung 9100 PRO 8TB M.2 NVMe 2280 | BSC dedicado |
+| SSD Base | Samsung 990 PRO 4TB M.2 NVMe 2280 | Base dedicado |
+| SSD snapshots / scratch | Samsung 990 PRO 4TB M.2 NVMe 2280 | Operación y staging |
+| Gabinete | Fractal Design Meshify 2 XL `FD-C-MES2X-01` | Mucho espacio y flujo de aire |
+| PSU | Seasonic PRIME TX-1300 ATX 3 | De sobra para esta build |
+
+### Advertencia de esta opcion
+
+- Es más barata y fácil de armar.
+- Pero para `BSC + Base` simultáneos sigue siendo más justa que la WRX90.
+- Los `128 GB` son utilizables, pero ya no me parece una build tan cómoda para crecer.
+
+## 3. PC Exacta 2026 Para Full Nodo Solana
+
+Objetivo:
+
+- full node serio con Agave
+- base fuerte para validator y RPC node
+- 512 GB ECC
+- discos separados como recomienda la documentación
+
+### BOM exacta
+
+| Componente | Modelo exacto | Por qué |
+| --- | --- | --- |
+| CPU | AMD Ryzen Threadripper PRO 9975WX | CPU 2026 más actual en esa plataforma, 32 cores, soporte oficial WRX90 |
+| Motherboard | ASUS Pro WS WRX90E-SAGE SE | Plataforma workstation correcta para 512 GB ECC y varios NVMe |
+| Cooler CPU | Noctua NH-U14S TR5-SP6 | Referencia específica para socket TR5/SP6 |
+| RAM | 8 x Micron 64GB DDR5-6400 RDIMM `MTC40F2046S1RC64BR` | 512 GB totales, tipo exacto que la placa soporta y Crucial lista como compatible |
+| SSD SO | Samsung 990 PRO 4TB M.2 NVMe 2280 | Sistema, herramientas y monitoreo |
+| SSD accounts | Samsung 9100 PRO 4TB M.2 NVMe 2280 | Disco dedicado a accounts |
+| SSD ledger | Samsung 9100 PRO 4TB M.2 NVMe 2280 | Disco dedicado a ledger |
+| SSD snapshots | Samsung 990 PRO 4TB M.2 NVMe 2280 | Snapshots y recuperación |
+| Gabinete | Fractal Design Meshify 2 XL `FD-C-MES2X-01` | Acepta SSI-EEB y hardware grande |
+| PSU | Seasonic PRIME TX-1600 ATX 3 | Mucho margen para operación continua |
+| UPS | APC Smart-UPS SMT1500IC | Muy recomendable para evitar corrupción por cortes |
+| SO recomendado | Ubuntu 24.04 LTS | Lo más sensato para operar Agave 24/7 |
+
+### Compatibilidad de esta build
+
+- CPU y motherboard:
+  - `9975WX` figura en la lista de CPUs soportados para la WRX90.
+- RAM y motherboard:
+  - la placa exige `DDR5 ECC Registered Memory`.
+  - `MTC40F2046S1RC64BR` aparece como compatible en el configurador para esa placa.
+- Storage:
+  - todos los SSD elegidos son `M.2 2280 NVMe`, formato soportado por la WRX90.
+- Case:
+  - `Meshify 2 XL` soporta `SSI-EEB`, así que el board entra.
+
+### Distribucion recomendada para Solana
+
+- `M.2_1`: SO = `Samsung 990 PRO 4TB`
+- `M.2_2`: accounts = `Samsung 9100 PRO 4TB`
+- `M.2_3`: ledger = `Samsung 9100 PRO 4TB`
+- `M.2_4`: snapshots = `Samsung 990 PRO 4TB`
+
+### Si quieres bajar costo sin romper la idea
+
+- CPU alternativa: `Threadripper PRO 7965WX`
+- RAM alternativa validator-only: `4 x 64GB = 256 GB`
+
+Pero si tu meta es `full node Solana serio`, dejaría la build en `512 GB`.
+
+## 4. Resumen Rapido De Compra
+
+| Escenario | Compra exacta recomendada |
+| --- | --- |
+| Exprimir tu PC actual | `5950X + NH-D15 + 128GB DDR4 + 990 PRO 4TB + 870 EVO 4TB` |
+| BSC + Base en una sola máquina | `7965WX + WRX90E-SAGE SE + 256GB ECC RDIMM + 9100 PRO 8TB + 3x 990 PRO 4TB + Meshify 2 XL + TX-1600` |
+| Solana full node | `9975WX + WRX90E-SAGE SE + 512GB ECC RDIMM + 2x 9100 PRO 4TB + 2x 990 PRO 4TB + Meshify 2 XL + TX-1600` |
+
+## 5. Mi Recomendacion Final
+
+- Si quieres comprar una sola maquina seria: ve por la build `WRX90 + 7965WX + 256GB ECC` para `BSC + Base`.
+- Si además vas a meterte con `Solana` en serio: haz otra máquina separada con `WRX90 + 9975WX + 512GB ECC`.
+- Si solo quieres laboratorio con bajo gasto: actualiza tu AM4 con `5950X`, pero no la confundas con una estación real de nodos productivos.
+
+## 6. Fuentes De Compatibilidad Usadas
+
+- `ASUS Pro WS WRX90E-SAGE SE` CPU support y tech specs.
+- `ASUS ProArt X870E-CREATOR WIFI` tech specs.
+- `Crucial compatible upgrade for ASUS Pro WS WRX90E-SAGE SE`.
+- `Crucial compatible upgrade for ASUS ProArt X870E-CREATOR WIFI`.
+- `Fractal Meshify 2 XL` compatibility page.
+- `Samsung Memory Storage` family page mostrando `9100 PRO` como SSD actual.
+
+
+
